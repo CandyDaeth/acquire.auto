@@ -214,6 +214,81 @@
     .card.safe::before { display: none; }
     .card.safe .clear-btn { display: none; }
 
+    .log {
+      margin-top: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 16px 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .log-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .log-hint {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin: 4px 0 12px;
+    }
+
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2px 12px;
+      text-align: left;
+      width: 100%;
+      background: #12181f;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .log-row:hover { background: #18212b; }
+
+    .log-row.current {
+      border-color: #7aa7ff;
+      background: #17233a;
+    }
+
+    .log-time {
+      grid-row: 1 / span 2;
+      align-self: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .log-msg { font-size: 0.92rem; font-weight: 700; }
+
+    .log-snap {
+      color: var(--muted);
+      font-size: 0.75rem;
+      overflow-wrap: anywhere;
+    }
+
+    .log-empty {
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 8px 2px;
+    }
+
     @media (max-width: 1024px) {
       .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .metric strong { font-size: 1.05rem; }
@@ -320,6 +395,12 @@
     <h1>Acquire 타일 시세</h1>
     <p class="sub">타일 수를 입력하면 주식 가격과 주주 보너스가 갱신됩니다.</p>
     <section class="board" id="board"></section>
+
+    <section class="log" aria-label="log">
+      <h2 class="log-title">log</h2>
+      <p class="log-hint">기록을 누르면 해당 시점의 상태로 불러옵니다.</p>
+      <div class="log-list" id="logList"></div>
+    </section>
   </div>
 
   <div class="modal-overlay" id="mergeModal" hidden>
@@ -433,14 +514,134 @@
       return clamp(parseInt(card.querySelector("input").value, 10));
     }
 
+    const STORAGE_KEY = "acquire-tile-state-v1";
+    const MAX_LOG = 500;
+    let logEntries = [];
+    let currentLogId = null;
+    let logSeq = 0;
+    let lastSnap = SHEET.companies.map(() => 0);
+
+    function cardByCol(col) {
+      return document.querySelector(`.card[data-col="${col}"]`);
+    }
+
+    function snapshot() {
+      return SHEET.companies.map((_, i) => getTiles(cardByCol(i)));
+    }
+
+    function applyState(tiles) {
+      tiles.forEach((t, i) => updateCard(cardByCol(i), clamp(Number(t) || 0)));
+      lastSnap = snapshot();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          tiles: snapshot(),
+          log: logEntries,
+          current: currentLogId,
+          seq: logSeq
+        }));
+      } catch (e) { /* 저장 불가 환경이면 무시 */ }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        if (!d || !Array.isArray(d.tiles) || d.tiles.length !== SHEET.companies.length) return false;
+        logEntries = (Array.isArray(d.log) ? d.log : []).filter((e) =>
+          e && typeof e.msg === "string" && Array.isArray(e.tiles) && e.tiles.length === SHEET.companies.length
+        );
+        logSeq = Math.max(Number(d.seq) || 0, ...logEntries.map((e) => Number(e.id) || 0));
+        currentLogId = d.current;
+        applyState(d.tiles);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function commit(msg) {
+      lastSnap = snapshot();
+      const entry = { id: ++logSeq, time: Date.now(), msg, tiles: lastSnap.slice() };
+      logEntries.push(entry);
+      if (logEntries.length > MAX_LOG) logEntries.shift();
+      currentLogId = entry.id;
+      saveState();
+      renderLog();
+    }
+
+    function renderLog() {
+      const list = document.getElementById("logList");
+      list.innerHTML = "";
+      if (!logEntries.length) {
+        const empty = document.createElement("p");
+        empty.className = "log-empty";
+        empty.textContent = "기록이 없습니다.";
+        list.appendChild(empty);
+        return;
+      }
+      logEntries.slice().reverse().forEach((e) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "log-row" + (e.id === currentLogId ? " current" : "");
+        row.dataset.id = String(e.id);
+
+        const time = document.createElement("span");
+        time.className = "log-time";
+        time.textContent = new Date(e.time).toLocaleString("ko-KR", {
+          month: "numeric", day: "numeric",
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+        });
+
+        const msg = document.createElement("span");
+        msg.className = "log-msg";
+        msg.textContent = e.msg;
+
+        const snap = document.createElement("span");
+        snap.className = "log-snap";
+        const parts = SHEET.companies
+          .map((name, i) => (e.tiles[i] > 0 ? `${name} ${e.tiles[i]}` : ""))
+          .filter(Boolean);
+        snap.textContent = parts.length ? parts.join(" · ") : "전체 0";
+
+        row.append(time, msg, snap);
+        list.appendChild(row);
+      });
+    }
+
+    document.getElementById("logList").addEventListener("click", (event) => {
+      const row = event.target.closest(".log-row");
+      if (!row) return;
+      const entry = logEntries.find((e) => String(e.id) === row.dataset.id);
+      if (!entry) return;
+      closeMergeModal();
+      applyState(entry.tiles);
+      currentLogId = entry.id;
+      saveState();
+      renderLog();
+    });
+
     function bindCard(card) {
       const input = card.querySelector("input");
+      const col = Number(card.dataset.col);
+      const name = SHEET.companies[col];
       updateCard(card, 0);
+
+      function commitTileChange() {
+        const before = lastSnap[col];
+        const after = getTiles(card);
+        if (before === after) return;
+        commit(before === 0 ? `${name} 기업설립 (0 → ${after})` : `${name} 타일 ${before} → ${after}`);
+      }
 
       card.addEventListener("click", (event) => {
         const action = event.target.dataset.action;
         if (card.classList.contains("empty")) {
           updateCard(card, 2);
+          commitTileChange();
           return;
         }
         if (!action) return;
@@ -452,11 +653,15 @@
         if (action === "plus") tiles += (tiles === 0 ? 2 : 1);
         if (action === "minus") tiles -= 1;
         updateCard(card, clamp(tiles));
+        commitTileChange();
       });
 
       input.addEventListener("input", () => {
         updateCard(card, clamp(parseInt(input.value, 10)));
+        saveState();
       });
+
+      input.addEventListener("change", commitTileChange);
     }
 
     const mergeModal = document.getElementById("mergeModal");
@@ -503,10 +708,15 @@
       const sourceTiles = getTiles(mergeSourceCard);
       const targetTiles = getTiles(targetCard);
 
-      updateCard(targetCard, clamp(targetTiles + sourceTiles));
+      const srcName = mergeSourceCard.querySelector(".name").textContent;
+      const tgtName = targetCard.querySelector(".name").textContent;
+      const merged = clamp(targetTiles + sourceTiles);
+
+      updateCard(targetCard, merged);
       updateCard(mergeSourceCard, 0);
 
       closeMergeModal();
+      commit(`합병: ${srcName}(${sourceTiles}) → ${tgtName}(${targetTiles}) = ${merged}`);
     });
 
     mergeCancel.addEventListener("click", closeMergeModal);
@@ -515,6 +725,8 @@
     });
 
     render();
+    if (!loadState()) commit("시작 (전체 타일 0)");
+    else renderLog();
   </script>
 </body>
 </html>
