@@ -754,7 +754,7 @@
 
       const srcName = mergeSourceCard.querySelector(".name").textContent;
       const tgtName = targetCard.querySelector(".name").textContent;
-      const merged = clamp(targetTiles + sourceTiles);
+      const merged = clamp(targetTiles + sourceTiles + 1);
 
       updateCard(targetCard, merged);
       updateCard(mergeSourceCard, 0);
