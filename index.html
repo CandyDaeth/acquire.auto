@@ -170,11 +170,16 @@
 
     .metrics {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
       margin-top: auto;
     }
-
+	
+	.metric-price{
+		grid-column: span 3;
+		display: flex;
+		align-items: center;
+	}
     .metric-trio { display: contents; }
 
     .metric {
@@ -200,6 +205,15 @@
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
+	
+	.metric-price>*{ flex: 1; }
+	.metric-price>span{
+		margin-bottom: 0;
+	}
+	.metric-price>strong{
+		border-left: 1px solid rgb(100,100,100);
+		font-size: 1rem;
+	}
 
     .stable-badge {
       display: none;
