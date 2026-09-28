@@ -38,6 +38,32 @@
       margin-bottom: 6px;
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .title-row h1 { margin-bottom: 0; }
+
+    .reset-btn {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: #243040;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .reset-btn:hover { background: #314155; }
+    .reset-btn:active { transform: translateY(1px); }
+
     .sub {
       color: var(--muted);
       font-size: 0.92rem;
@@ -392,7 +418,10 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Acquire 타일 시세</h1>
+    <div class="title-row">
+      <h1>Acquire 타일 시세</h1>
+      <button type="button" class="reset-btn" id="resetAll">게임 초기화</button>
+    </div>
     <p class="sub">타일 수를 입력하면 주식 가격과 주주 보너스가 갱신됩니다.</p>
     <section class="board" id="board"></section>
 
@@ -722,6 +751,13 @@
     mergeCancel.addEventListener("click", closeMergeModal);
     mergeModal.addEventListener("click", (event) => {
       if (event.target === mergeModal) closeMergeModal();
+    });
+
+    document.getElementById("resetAll").addEventListener("click", () => {
+      if (snapshot().every((t) => t === 0)) return;
+      closeMergeModal();
+      applyState(SHEET.companies.map(() => 0));
+      commit("모든 기업 타일 0으로 초기화");
     });
 
     render();
