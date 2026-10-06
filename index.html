@@ -428,9 +428,7 @@
 
     .modal-option {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+	  flex-direction: column;
       height: 60px;
       border: 1px solid var(--line);
       background: #12181f;
@@ -441,6 +439,16 @@
       font-weight: 700;
       cursor: pointer;
     }
+	
+    .modal-option>span {
+      width: 100%;
+	}
+	.modal-option>span:first-child {
+      text-align: left;
+	}
+	.modal-option>span:last-child {
+      text-align: right;
+	}
 
     .modal-option:hover { filter: brightness(1.15); }
 
