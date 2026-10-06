@@ -376,6 +376,47 @@
       margin-bottom: 16px;
     }
 
+    .modal-source-metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 16px;
+    }
+
+    .modal-source-price,
+    .modal-source-trio {
+      display: grid;
+      gap: 9px;
+    }
+
+    .modal-source-price { grid-template-columns: 1fr; }
+    .modal-source-trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .modal-source-metrics .metric {
+      background: #12181f;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 15px 6px 13px;
+      text-align: center;
+      min-width: 0;
+    }
+
+    .modal-source-metrics .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 1.02rem;
+      margin-bottom: 9px;
+      white-space: nowrap;
+    }
+
+    .modal-source-metrics .metric strong {
+      display: block;
+      font-size: 1.35rem;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent, var(--text));
+    }
+
     .modal-list {
       display: flex;
       flex-direction: column;
@@ -448,8 +489,9 @@
   </div>
 
   <div class="modal-overlay" id="mergeModal" hidden>
-    <div class="modal">
-      <p class="modal-title">합병 시키기</p>
+    <div class="modal" id="mergeModalBox">
+      <p class="modal-title" id="mergeTitle">합병 시키기</p>
+      <div class="modal-source-metrics" id="mergeSourceMetrics"></div>
       <p class="modal-sub">타일을 넘겨줄 기업을 선택하세요.</p>
       <div class="modal-list" id="mergeList"></div>
       <button type="button" class="modal-cancel" id="mergeCancel">취소</button>
@@ -709,6 +751,8 @@
     }
 
     const mergeModal = document.getElementById("mergeModal");
+    const mergeTitle = document.getElementById("mergeTitle");
+    const mergeSourceMetrics = document.getElementById("mergeSourceMetrics");
     const mergeList = document.getElementById("mergeList");
     const mergeCancel = document.getElementById("mergeCancel");
     let mergeSourceCard = null;
@@ -716,6 +760,9 @@
     function closeMergeModal() {
       mergeModal.hidden = true;
       mergeSourceCard = null;
+      mergeTitle.textContent = "합병 시키기";
+      mergeSourceMetrics.innerHTML = "";
+      mergeSourceMetrics.style.removeProperty("--accent");
       mergeList.innerHTML = "";
     }
 
@@ -723,17 +770,46 @@
       mergeSourceCard = sourceCard;
       const sourceCol = Number(sourceCard.dataset.col);
       const sourceTiles = getTiles(sourceCard);
+      const sourceName = sourceCard.querySelector(".name").textContent;
+      const accent = sourceCard.style.getPropertyValue("--accent") || "#64748b";
+
+      mergeTitle.textContent = `${sourceName} 합병 시키기`;
+
+      mergeSourceMetrics.style.setProperty("--accent", accent);
+      mergeSourceMetrics.innerHTML = `
+        <div class="modal-source-price">
+          <div class="metric">
+            <span>주식 가격</span>
+            <strong>${money(lookup(SHEET.price, sourceTiles, sourceCol))}</strong>
+          </div>
+        </div>
+        <div class="modal-source-trio">
+          <div class="metric">
+            <span>최대주주</span>
+            <strong>${money(lookup(SHEET.bonus, sourceTiles, sourceCol))}</strong>
+          </div>
+          <div class="metric">
+            <span>2대주주</span>
+            <strong>${money(lookup(SHEET.bonus2, sourceTiles, sourceCol))}</strong>
+          </div>
+          <div class="metric">
+            <span>3대주주</span>
+            <strong>${money(lookup(SHEET.bonus3, sourceTiles, sourceCol))}</strong>
+          </div>
+        </div>
+      `;
+
       const otherCards = Array.from(document.querySelectorAll(".card"))
         .filter((c) => Number(c.dataset.col) !== sourceCol)
         .filter((c) => getTiles(c) >= sourceTiles);
 
       mergeList.innerHTML = otherCards.length ? otherCards.map((c) => {
         const name = c.querySelector(".name").textContent;
-        const accent = c.style.getPropertyValue("--accent") || "#64748b";
+        const dotAccent = c.style.getPropertyValue("--accent") || "#64748b";
         const tiles = getTiles(c);
         return `
           <button type="button" class="modal-option" data-target-col="${c.dataset.col}">
-            <span><span class="swatch" style="--dot:${accent}"></span>${name}</span>
+            <span><span class="swatch" style="--dot:${dotAccent}"></span>${name}</span>
             <span class="tiles-count">${tiles}칸</span>
           </button>
         `;
